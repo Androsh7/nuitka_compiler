@@ -60,7 +60,6 @@ def build_docker_bake_file(build_images: list[ImageSpec]) -> Path:
             bake_file.write(
                 f'  context = "{str(PARENT_DIRECTORY).replace("\\", "/")}"\n'
             )
-            bake_file.write(f"  parallelism = {PARALLELISM}\n")
             if image_spec.build_args:
                 bake_file.write("  args = {\n")
                 for arg_key, arg_value in image_spec.build_args.items():
@@ -108,6 +107,9 @@ def main():
 
             # Remove the bake file
             os.remove(bake_file_path)
+
+            # Clear the build list
+            build_list.clear()
 
 if __name__ == "__main__":
     main()
