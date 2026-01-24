@@ -14,6 +14,7 @@ from config import (
     OPENSSL_VERSION,
     NAMESPACE,
     PARENT_DIRECTORY,
+    PARALLELISM,
 )
 
 # Constants
@@ -59,6 +60,7 @@ def build_docker_bake_file(build_images: list[ImageSpec]) -> Path:
             bake_file.write(
                 f'  context = "{str(PARENT_DIRECTORY).replace("\\", "/")}"\n'
             )
+            bake_file.write(f"  parallelism = {PARALLELISM}\n")
             if image_spec.build_args:
                 bake_file.write("  args = {\n")
                 for arg_key, arg_value in image_spec.build_args.items():
@@ -90,17 +92,22 @@ def main():
                 )
 
     # Generate docker-bake.hcl file
-    bake_file_path = build_docker_bake_file(BUILD_IMAGES)
+    build_list = []
+    for index, image in enumerate(BUILD_IMAGES, start=1):
+        build_list.append(image)
+        if len(build_list) == PARALLELISM or index == len(BUILD_IMAGES):
 
-    # Build and push images using docker bake
-    os.environ["BUILDX_BAKE_ENTITLEMENTS_FS"] = "0"
-    subprocess.run(
-        ["docker", "bake", "--file", str(bake_file_path), "--push"], check=True
-    )
+            # Create bake file
+            bake_file_path = build_docker_bake_file(build_list)
 
-    # Remove the bake file
-    os.remove(bake_file_path)
+            # Build and push images using docker bake
+            os.environ["BUILDX_BAKE_ENTITLEMENTS_FS"] = "0"
+            subprocess.run(
+                ["docker", "bake", "--file", str(bake_file_path), "--push"], check=True
+            )
 
+            # Remove the bake file
+            os.remove(bake_file_path)
 
 if __name__ == "__main__":
     main()
