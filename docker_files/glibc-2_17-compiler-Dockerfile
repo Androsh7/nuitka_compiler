@@ -56,7 +56,8 @@ shared zlib \
 && make install_sw \
 && echo "/opt/openssl/lib64" > /etc/ld.so.conf.d/openssl.conf \
 && ldconfig \
-&& /opt/openssl/bin/openssl version -a
+&& /opt/openssl/bin/openssl version -a \
+&& rm -rf /src/*
 
 # Set OpenSSL environment variables
 ENV OPENSSL_ROOT=/opt/openssl
@@ -81,7 +82,8 @@ RUN curl -fsSLO https://www.python.org/ftp/python/${PYTHON_VERSION}/Python-${PYT
 --enable-optimizations \
 --with-lto \
 && make -j"$(nproc)" profile-opt \
-&& make install
+&& make install \
+&& rm -rf /src/*
 
 # Set Python environment variables
 ENV PATH=/opt/python-${PYTHON_VERSION}/bin:${PATH}
@@ -89,6 +91,3 @@ ENV PATH=/opt/python-${PYTHON_VERSION}/bin:${PATH}
 # Update pip, setuptools, wheel, and install nuitka
 RUN python3 -m pip install --upgrade pip setuptools wheel \ 
 && python3 -m pip install nuitka
-
-# Clean up source directory
-RUN rm -rf /src/*
