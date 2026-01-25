@@ -21,7 +21,7 @@ LIBC_TO_DOCKERFILE = [
         PARENT_DIRECTORY / "docker_files" / "musl-1_2-compiler-Dockerfile",
     ),
 ]
-ARCHITECTURES = ["x86_64"]
+ARCHITECTURES = ["x86_64", "aarch64"]
 PYTHON_VERSIONS = ["3.9.24", "3.10.19", "3.11.14", "3.12.12", "3.13.11", "3.14.2"]
 OPENSSL_VERSION = "3.0.18"
 NAMESPACE = "androsh7"

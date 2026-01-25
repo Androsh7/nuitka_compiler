@@ -95,6 +95,11 @@ def main():
     for index, image in enumerate(BUILD_IMAGES, start=1):
         build_list.append(image)
         if len(build_list) == PARALLELISM or index == len(BUILD_IMAGES):
+            # Print debug info
+            print(f"Building images {index - len(build_list) + 1} to {index}...")
+            for build in build_list:
+                print(f" - {build.tag}", end="")
+            print("\n")
 
             # Create bake file
             bake_file_path = build_docker_bake_file(build_list)
@@ -110,6 +115,7 @@ def main():
 
             # Clear the build list
             build_list.clear()
+
 
 if __name__ == "__main__":
     main()
