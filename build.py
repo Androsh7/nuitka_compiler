@@ -3,27 +3,33 @@
 # Standard libraries
 import os
 import subprocess
-from pathlib import Path
+import sys
 from dataclasses import dataclass
 from datetime import datetime, timezone
+from pathlib import Path
 
 # Project libraries
 from config import (
-    LIBC_TO_DOCKERFILE,
     ARCHITECTURES,
-    PYTHON_VERSIONS,
-    OPENSSL_VERSION,
+    LIBC_TO_DOCKERFILE,
     NAMESPACE,
-    PARENT_DIRECTORY,
+    OPENSSL_VERSION,
     PARALLELISM,
+    PARENT_DIRECTORY,
+    PYTHON_VERSIONS,
     SOURCE_URL,
 )
 
 # Constants
 with open("VERSION.txt", "r", encoding="utf-8") as version_file:
     VERSION = version_file.read().strip()
-COMMIT_HASH = subprocess.run(["git", "rev-parse", "HEAD"], check=True, capture_output=True).stdout.decode().strip()
+COMMIT_HASH = (
+    subprocess.run(["git", "rev-parse", "HEAD"], check=True, capture_output=True)
+    .stdout.decode()
+    .strip()
+)
 DATETIME_FORMAT = "%Y-%m-%d %H:%M:%S+00:00"
+
 
 @dataclass(frozen=True)
 class ImageSpec:
@@ -51,8 +57,10 @@ def build_docker_bake_file(build_images: list[ImageSpec]) -> Path:
 
         for image_spec in build_images:
             bake_file.write(f'target "{image_spec.tag.replace(".", "-")}" {{\n')
-            bake_file.write(f'  context = "."\n')
-            bake_file.write(f'  allow = ["fs.read={str(PARENT_DIRECTORY).replace("\\", "/")}/*"]\n')
+            bake_file.write('  context = "."\n')
+            bake_file.write(
+                f'  allow = ["fs.read={str(PARENT_DIRECTORY).replace("\\", "/")}/*"]\n'
+            )
             bake_file.write(
                 f'  dockerfile = "{image_spec.dockerfile}"\n'.replace("\\", "/")
             )
@@ -67,15 +75,23 @@ def build_docker_bake_file(build_images: list[ImageSpec]) -> Path:
             bake_file.write("  labels = {\n")
             bake_file.write(f'    "maintainer" = "{NAMESPACE}"\n')
             bake_file.write(f'    "author" = "{NAMESPACE}"\n')
-            bake_file.write(f'    "license" = "MIT"\n')
+            bake_file.write('    "license" = "MIT"\n')
             bake_file.write(f'    "version" = "{VERSION}"\n')
             bake_file.write(f'    "source" = "{SOURCE_URL}"\n')
             bake_file.write(f'    "commit-hash" = "{COMMIT_HASH}"\n')
-            bake_file.write(f'    "python-version" = "{image_spec.build_args.get("PYTHON_VERSION", "not specified")}"\n')
-            bake_file.write(f'    "architecture" = "{image_spec.build_args.get("ARCHITECTURE", "no specified")}"\n')
-            bake_file.write(f'    "openssl-version" = "{image_spec.build_args.get("OPENSSL_VERSION", "not specified")}"\n')
-            bake_file.write(f'    "build-date" = "{datetime.now(timezone.utc).strftime("%Y-%m-%d")}"\n')
-            bake_file.write(f'    "base-image-maintainer" = "The ManyLinux project"\n')
+            bake_file.write(
+                f'    "python-version" = "{image_spec.build_args.get("PYTHON_VERSION", "not specified")}"\n'
+            )
+            bake_file.write(
+                f'    "architecture" = "{image_spec.build_args.get("ARCHITECTURE", "no specified")}"\n'
+            )
+            bake_file.write(
+                f'    "openssl-version" = "{image_spec.build_args.get("OPENSSL_VERSION", "not specified")}"\n'
+            )
+            bake_file.write(
+                f'    "build-date" = "{datetime.now(timezone.utc).strftime("%Y-%m-%d")}"\n'
+            )
+            bake_file.write('    "base-image-maintainer" = "The ManyLinux project"\n')
             bake_file.write("  }\n")
 
             # Set build arguments
@@ -95,7 +111,9 @@ def main():
     os.environ["BUILDX_BAKE_ENTITLEMENTS_FS"] = "0"
     buildx_allow_list = []
     for BUILD_IMAGE in LIBC_TO_DOCKERFILE:
-        buildx_allow_list.append(f"--allow=fs.read={str(BUILD_IMAGE[1]).replace('\\', '/')}")
+        buildx_allow_list.append(
+            f"--allow=fs.read={str(BUILD_IMAGE[1]).replace('\\', '/')}"
+        )
 
     # Generate image list
     BUILD_IMAGES = []
@@ -121,10 +139,14 @@ def main():
         build_list.append(image)
         if len(build_list) == PARALLELISM or index == len(BUILD_IMAGES):
             # Print debug info
-            print(f"Building images {index - len(build_list) + 1}-{index} out of {len(BUILD_IMAGES)} images", end="")
+            print(
+                f"Building images {index - len(build_list) + 1}-{index} out of {len(BUILD_IMAGES)} images",
+                end="",
+                file=sys.stderr,
+            )
             for build in build_list:
-                print(f" - {build.tag}", end="")
-            print("\n")
+                print(f" - {build.tag}", end="", file=sys.stderr)
+            print("\n", file=sys.stderr)
 
             # Create bake file
             bake_file_path = build_docker_bake_file(build_list)
@@ -144,7 +166,10 @@ def main():
             )
 
             # Log completion
-            print(f"Completed building images {index - len(build_list) + 1}-{index} out of {len(BUILD_IMAGES)} images")
+            print(
+                f"Completed building images {index - len(build_list) + 1}-{index} out of {len(BUILD_IMAGES)} images",
+                file=sys.stderr,
+            )
 
             # Remove the bake file
             os.remove(bake_file_path)
