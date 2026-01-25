@@ -107,6 +107,14 @@ def build_docker_bake_file(build_images: list[ImageSpec]) -> Path:
 def main():
     """Build docker images"""
 
+    # Login to docker hub
+    print("Logging in to Docker Hub", file=sys.stderr)
+    subprocess.run(
+        f"echo {os.environ['DOCKER_PASSWORD']} | docker login -u {os.environ['DOCKER_USERNAME']} --password-stdin",
+        shell=True,
+        check=True,
+    )
+
     # Create buildx constants
     os.environ["BUILDX_BAKE_ENTITLEMENTS_FS"] = "0"
     buildx_allow_list = []
@@ -138,7 +146,7 @@ def main():
     for index, image in enumerate(BUILD_IMAGES, start=1):
         build_list.append(image)
         if len(build_list) == PARALLELISM or index == len(BUILD_IMAGES):
-            # Print debug info
+            # Log start
             print(
                 f"Building images {index - len(build_list) + 1}-{index} out of {len(BUILD_IMAGES)} images",
                 end="",
@@ -177,6 +185,9 @@ def main():
             # Clear the build list
             build_list.clear()
 
+    # Logout from docker hub
+    print("Logging out from Docker Hub", file=sys.stderr)
+    subprocess.run("docker logout", shell=True, check=True)
 
 if __name__ == "__main__":
     main()
