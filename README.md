@@ -1,46 +1,103 @@
 # Nuitka Compiler Docker Images
 
-**manylinux-based, reproducible build environments for Nuitka**
-
 This repository builds and publishes a matrix of Docker images designed for **Nuitka compilation**. The images are intended for CI/CD and local build pipelines that need consistent Linux toolchains, pinned OpenSSL, and pinned CPython versions when compiling Python applications to native binaries with Nuitka.
 
----
+## Tag schema
 
-## Overview
+`androsh7/nuitka-compiler:<VERSION>-<architecture>-<libc>-py<python>`
 
-Each image is built on top of official `manylinux` base images from [quay.io](https://quay.io/organization/pypa) and layers in:
+| field        | options                                       |
+| ------------ | --------------------------------------------- |
+| version      | `latest`, `0.1.0`                             |
+| architecture | `x86_64`, `aarch64`                           |
+| libc         | `glibc-2.17`, `glibc-2.28`, `musl-1.2`        |
+| python       | `3.14`, `3.13`, `3.12`, `3.11`, `3.10`, `3.9` |
 
-- A **pinned OpenSSL build** (compiled from source)
-- A **pinned CPython build** (compiled from source with optimizations)
-- Updated Python packaging tools (`pip`, `setuptools`, `wheel`)
-- **Nuitka**, preinstalled and ready to use
+Examples:
 
-The build system generates a full build matrix across:
+- `androsh7/nuitka-compiler:latest-x86_64-glibc-2.17-py3.13`
+- `androsh7/nuitka-compiler:latest-x86_64-glibc-2.28-py3.11`
+- `androsh7/nuitka-compiler:0.1.0-aarch64-musl-1.2-py3.11`
 
-- **libc baselines** (e.g., manylinux / glibc variants)
-- **CPU architectures** (e.g., `x86_64`, `aarch64`)
-- **Python minor versions** (e.g., 3.9 → 3.13)
+## Why does this exist?
 
-This ensures predictable, repeatable compilation environments regardless of where the build runs.
+I love nuitka, it creates compact, fast, and portable python executables however it makes CI/CD a bit tricky.
 
----
+Windows is relatively straight forward, either run the nuitka build baremetal on a windows machine or use third-party CI/CD like github actions.
 
-## Supported x86_64 versions
+Linux is complicated because every executable must be built against a version of glibc or musl and cannot run on a system with an older version. This means that if you build an executable using glibc 2.24 and run it on CentOS 7 which runs glibc 2.17 you will get an error. The solution is to either build the executable on the oldest system you plan to support or ignore users on older platforms.
 
-| Architecture | libc baseline | Python version | OpenSSL | Tag suffix                       |
-| ------------ | ------------- | -------------- | ------- | -------------------------------- |
-| x86_64       | glibc-2.28    | 3.13           | 3.0.18  | VERSION-x86_64-glibc-2.28-py3.13 |
-| x86_64       | glibc-2.28    | 3.11           | 3.0.18  | VERSION-x86_64-glibc-2.28-py3.12 |
-| x86_64       | glibc-2.28    | 3.12           | 3.0.18  | VERSION-x86_64-glibc-2.28-py3.11 |
-| x86_64       | glibc-2.28    | 3.10           | 3.0.18  | VERSION-x86_64-glibc-2.28-py3.10 |
-| x86_64       | glibc-2.28    | 3.9            | 3.0.18  | VERSION-x86_64-glibc-2.28-py3.9  |
-| x86_64       | glibc-2.17    | 3.13           | 3.0.18  | VERSION-x86_64-glibc-2.17-py3.13 |
-| x86_64       | glibc-2.17    | 3.12           | 3.0.18  | VERSION-x86_64-glibc-2.17-py3.12 |
-| x86_64       | glibc-2.17    | 3.11           | 3.0.18  | VERSION-x86_64-glibc-2.17-py3.11 |
-| x86_64       | glibc-2.17    | 3.10           | 3.0.18  | VERSION-x86_64-glibc-2.17-py3.10 |
-| x86_64       | glibc-2.17    | 3.9            | 3.0.18  | VERSION-x86_64-glibc-2.17-py3.9  |
-| x86_64       | musl-1.1      | 3.13           | 3.0.18  | VERSION-x86_64-musl-1.1-py3.13   |
-| x86_64       | musl-1.1      | 3.12           | 3.0.18  | VERSION-x86_64-musl-1.1-py3.12   |
-| x86_64       | musl-1.1      | 3.11           | 3.0.18  | VERSION-x86_64-musl-1.1-py3.11   |
-| x86_64       | musl-1.1      | 3.10           | 3.0.18  | VERSION-x86_64-musl-1.1-py3.10   |
-| x86_64       | musl-1.1      | 3.9            | 3.0.18  | VERSION-x86_64-musl-1.1-py3.9    |
+This project aims to solve this issue by creating a series of easy-to-use docker images for CI/CD that contain all the requirements for building with nuitka using python (3.9 - 3.14) on x86 or arm using glibc 2.17 (released 2012), glibc 2.28 (released 2018), or musl 1.2 (released 2020).
+
+## Usage
+
+### Docker run
+
+This method involves starting the image in the background and then using cli commands to build the executable.
+
+I recommend this when using CI/CD tools like github actions
+
+```
+# Run the docker container in the background
+docker run --name nuitka-compiler --detach --rm androsh7/nuitka-compiler:latest-x86_64-glibc-2.17-py3.13 sleep infinity
+
+# Copy in the project files
+docker cp /path/to/project/files nuitka-compiler:/src
+
+# Install dependencies
+docker exec nuitka-compiler pip install -r /src/requirements.txt
+
+# Run nuitka build
+docker exec nuitka-compiler nuitka /src/main.py
+
+# Copy out executable
+docker cp nuitka-compiler:/src/main.exe
+
+# Stop the container
+docker stop nuitka-compiler
+```
+
+### Dockerfile
+
+This method involves create a custom dockerfile to build the images
+
+I recommend this for more complex builds.
+
+Example dockerfile:
+
+```
+ARG ARCHITECTURE="x86_64" # Set the architecture "x86_64" or "aarch64"
+ARG LIBC="glibc2.17" # Set the libc version "glibc-2.17", "glibc-2.28", "musl-1.2"
+ARG PYTHON_VERSION="3.13" # Set the python version (major.minor) "3.14", "3.13", "3.12", "3.11", "3.10", "3.9"
+
+FROM androsh7/nuitka-compiler:latest-${ARCHITECTURE}-${LIBC}-py${PYTHON_VERSION}
+
+# Copy project files into container
+COPY /your/project/files /src
+
+# Install dependencies
+RUN pip install -r /src/requirements.txt
+
+# Build executable
+RUN nuitka /src/main.py
+
+# Test the executable
+ENTRYPOINT ["/src/main.exe", "--version"]
+```
+
+The run the following commands:
+
+```
+# Build the image, this will build the nuitka executable
+docker build -t nuitka-compiler-my_project:latest .
+
+# Turn the image into a container
+docker run --name nuitka-compiler-my_project
+
+# Copy the executable out of the container
+docker cp nuitka-compiler-my_project:/src/main.exe main.exe
+
+# Delete the container and image
+docker rm nuitka-compiler-my_project
+docker rmi nuitka-compiler-my_project:latest
+```
