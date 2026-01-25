@@ -138,7 +138,7 @@ def main():
                     "--file",
                     str(bake_file_path),
                     "--push",
-                    "--progress=auto",
+                    "--progress=quiet",
                 ],
                 check=True,
             )
