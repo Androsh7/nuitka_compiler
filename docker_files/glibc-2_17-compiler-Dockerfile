@@ -54,7 +54,7 @@ RUN curl -fsSLO "https://www.openssl.org/source/openssl-${OPENSSL_VERSION}.tar.g
 shared zlib \
 && make -j"$(nproc)" \
 && make install_sw \
-&& echo "/opt/openssl/lib64" > /etc/ld.so.conf.d/openssl.conf \
+&& { echo "/opt/openssl/lib64"; echo "/opt/openssl/lib"; } > /etc/ld.so.conf.d/openssl.conf \
 && ldconfig \
 && /opt/openssl/bin/openssl version -a \
 && rm -rf /src/*
@@ -62,22 +62,28 @@ shared zlib \
 # Set OpenSSL environment variables
 ENV OPENSSL_ROOT=/opt/openssl
 ENV PATH="${OPENSSL_ROOT}/bin:${PATH}"
-ENV LD_LIBRARY_PATH="${OPENSSL_ROOT}/lib64:${LD_LIBRARY_PATH}"
+ENV LD_LIBRARY_PATH="${OPENSSL_ROOT}/lib64:${OPENSSL_ROOT}/lib:${LD_LIBRARY_PATH}"
 
 # Build Python from source
 ARG PYTHON_VERSION="3.13.11"
-RUN curl -fsSLO https://www.python.org/ftp/python/${PYTHON_VERSION}/Python-${PYTHON_VERSION}.tgz \
-&& tar -xzf Python-${PYTHON_VERSION}.tgz \
-&& cd Python-${PYTHON_VERSION} \
+RUN curl -fsSLO "https://www.python.org/ftp/python/${PYTHON_VERSION}/Python-${PYTHON_VERSION}.tgz" \
+&& tar -xzf "Python-${PYTHON_VERSION}.tgz" \
+&& cd "Python-${PYTHON_VERSION}" \
 && export CPPFLAGS="-I${OPENSSL_ROOT}/include" \
-&& export LDFLAGS="-L${OPENSSL_ROOT}/lib64 -Wl,-rpath,${OPENSSL_ROOT}/lib64" \
+&& OPENSSL_LIBDIR="" \
+&& if [ -d "${OPENSSL_ROOT}/lib64" ] && ls "${OPENSSL_ROOT}/lib64"/libssl.so* >/dev/null 2>&1; then \
+OPENSSL_LIBDIR="${OPENSSL_ROOT}/lib64"; \
+else \
+OPENSSL_LIBDIR="${OPENSSL_ROOT}/lib"; \
+fi \
+&& export LDFLAGS="-L${OPENSSL_LIBDIR} -Wl,-rpath,${OPENSSL_LIBDIR}" \
 && export CFLAGS="-O2 -pipe" \
 && export CXXFLAGS="-O2 -pipe" \
 && ./configure \
---prefix=/opt/python-${PYTHON_VERSION} \
+--prefix="/opt/python-${PYTHON_VERSION}" \
 --disable-shared \
 --with-ensurepip=install \
---with-openssl=${OPENSSL_ROOT} \
+--with-openssl="${OPENSSL_ROOT}" \
 --with-openssl-rpath=auto \
 --enable-optimizations \
 --with-lto \
@@ -88,6 +94,12 @@ RUN curl -fsSLO https://www.python.org/ftp/python/${PYTHON_VERSION}/Python-${PYT
 # Set Python environment variables
 ENV PATH=/opt/python-${PYTHON_VERSION}/bin:${PATH}
 
-# Update pip, setuptools, wheel, and install nuitka
+# Update pip, setuptools, wheel, and install/test nuitka
 RUN python3 -m pip install --upgrade pip setuptools wheel \ 
-&& python3 -m pip install nuitka
+&& python3 -m pip install nuitka \
+# Compile a test file to verify nuitka works
+&& echo 'print("Nuitka is working!")' > test_nuitka.py \
+&& python3 -m nuitka --standalone --onefile --output-file=/src/test_nuitka_compiled.bin test_nuitka.py \
+&& chmod +x /src/test_nuitka_compiled.bin \
+&& /src/test_nuitka_compiled.bin \
+&& rm -rf /src/*

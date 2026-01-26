@@ -81,6 +81,12 @@ PROFILE_TASK='-m test --pgo -x test_re' \
 # Set Python environment variables
 ENV PATH=/opt/python-${PYTHON_VERSION}/bin:${PATH}
 
-# Update pip, setuptools, wheel, and install nuitka
+# Update pip, setuptools, wheel, and install/test nuitka
 RUN python3 -m pip install --upgrade pip setuptools wheel \ 
-&& python3 -m pip install nuitka
+&& python3 -m pip install nuitka \
+# Compile a test file to verify nuitka works
+&& echo 'print("Nuitka is working!")' > test_nuitka.py \
+&& python3 -m nuitka --standalone --onefile --output-file=/src/test_nuitka_compiled.bin test_nuitka.py \
+&& chmod +x /src/test_nuitka_compiled.bin \
+&& /src/test_nuitka_compiled.bin \
+&& rm -rf /src/*
