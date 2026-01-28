@@ -1,0 +1,100 @@
+ARG ARCHITECTURE="x86_64"
+FROM quay.io/pypa/musllinux_1_2_${ARCHITECTURE}:latest
+
+WORKDIR /src
+
+# Install libraries
+RUN apk add --no-cache \
+bash \
+build-base \
+linux-headers \
+git \
+curl \
+pkgconf \
+binutils \
+findutils \
+file \
+patch \
+diffutils \
+perl \
+zlib-dev \
+bzip2-dev \
+xz-dev \
+gettext \
+gettext-dev \
+gettext-libs \
+libintl \
+libffi-dev \
+sqlite-dev \
+readline-dev \
+ncurses-dev \
+gdbm-dev \
+expat-dev \
+util-linux-dev \
+libuuid \
+ca-certificates \
+tar \
+gzip \
+zip \
+unzip \
+&& update-ca-certificates
+
+# Build OpenSSL from source
+ARG OPENSSL_VERSION="3.0.18"
+RUN curl -fsSLO "https://www.openssl.org/source/openssl-${OPENSSL_VERSION}.tar.gz" \
+&& tar -xzf "openssl-${OPENSSL_VERSION}.tar.gz" \
+&& cd "openssl-${OPENSSL_VERSION}" \
+&& export LDFLAGS="-Wl,-rpath,/opt/openssl/lib" \
+&& ./config \
+--prefix=/opt/openssl \
+--openssldir=/opt/openssl \
+--libdir=lib \
+shared zlib \
+&& make -j"$(nproc)" \
+&& make install_sw \
+&& LD_LIBRARY_PATH=/opt/openssl/lib /opt/openssl/bin/openssl version -a \
+&& /opt/openssl/bin/openssl version -a \
+&& rm -rf /src/*
+
+# Set OpenSSL environment variables
+ENV OPENSSL_ROOT=/opt/openssl
+ENV PATH="${OPENSSL_ROOT}/bin:${PATH}"
+
+# Build Python from source
+ARG PYTHON_VERSION="3.13.11"
+RUN curl -fsSLO https://www.python.org/ftp/python/${PYTHON_VERSION}/Python-${PYTHON_VERSION}.tgz \
+&& tar -xzf Python-${PYTHON_VERSION}.tgz \
+&& cd Python-${PYTHON_VERSION} \
+&& export CPPFLAGS="-I${OPENSSL_ROOT}/include" \
+&& export LDFLAGS="-L${OPENSSL_ROOT}/lib -Wl,-rpath,${OPENSSL_ROOT}/lib" \
+&& export CFLAGS="-O2 -pipe" \
+&& export CXXFLAGS="-O2 -pipe" \
+&& export LIBS="-lintl" \
+&& export ac_cv_lib_intl_textdomain=no \
+&& export ac_cv_header_libintl_h=no \
+&& ./configure \
+--prefix=/opt/python-${PYTHON_VERSION} \
+--disable-shared \
+--with-ensurepip=install \
+--with-openssl=${OPENSSL_ROOT} \
+--with-openssl-rpath=auto \
+--enable-optimizations \
+--with-lto \
+&& make -j"$(nproc)" profile-opt \
+PROFILE_TASK='-m test --pgo -x test_re' \
+&& make install \
+&& rm -rf /src/*
+
+# Set Python environment variables
+ENV PATH=/opt/python-${PYTHON_VERSION}/bin:${PATH}
+ENV LDFLAGS="-lintl"
+
+# Update pip, setuptools, wheel, and install/test nuitka
+RUN python3 -m pip install --upgrade pip setuptools wheel \ 
+&& python3 -m pip install nuitka \
+# Compile a test file to verify nuitka works
+&& echo 'print("Nuitka is working!")' > test_nuitka.py \
+&& python3 -m nuitka --standalone --onefile --output-file=/src/test_nuitka_compiled.bin test_nuitka.py \
+&& chmod +x /src/test_nuitka_compiled.bin \
+&& /src/test_nuitka_compiled.bin \
+&& rm -rf /src/*
