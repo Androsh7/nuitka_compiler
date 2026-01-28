@@ -189,5 +189,6 @@ def main():
     print("Logging out from Docker Hub", file=sys.stderr)
     subprocess.run("docker logout", shell=True, check=True)
 
+
 if __name__ == "__main__":
     main()
