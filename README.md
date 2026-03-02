@@ -8,7 +8,7 @@ This repository builds and publishes a matrix of Docker images designed for **Nu
 
 | field        | options                                       |
 | ------------ | --------------------------------------------- |
-| version      | `latest`, `0.1.0`                             |
+| version      | `latest`, `0.1.0`, `0.2.0`                    |
 | architecture | `x86_64`, `aarch64`                           |
 | libc         | `glibc-2.17`, `glibc-2.28`, `musl-1.2`        |
 | python       | `3.14`, `3.13`, `3.12`, `3.11`, `3.10`, `3.9` |
@@ -17,7 +17,7 @@ Examples:
 
 - `androsh7/nuitka-compiler:latest-x86_64-glibc-2.17-py3.13`
 - `androsh7/nuitka-compiler:latest-x86_64-glibc-2.28-py3.11`
-- `androsh7/nuitka-compiler:0.1.0-aarch64-musl-1.2-py3.11`
+- `androsh7/nuitka-compiler:0.2.0-aarch64-musl-1.2-py3.11`
 
 ## Why does this exist?
 
@@ -48,10 +48,10 @@ docker cp /path/to/project/files nuitka-compiler:/src
 docker exec nuitka-compiler pip install -r /src/requirements.txt
 
 # Run nuitka build
-docker exec nuitka-compiler nuitka /src/main.py
+docker exec nuitka-compiler python3 -m nuitka --standalone --onefile /src/main.py
 
 # Copy out executable
-docker cp nuitka-compiler:/src/main.exe
+docker cp nuitka-compiler:/src/main.bin main.bin
 
 # Stop the container
 docker stop nuitka-compiler
@@ -79,10 +79,10 @@ COPY /your/project/files /src
 RUN pip install -r /src/requirements.txt
 
 # Build executable
-RUN nuitka /src/main.py
+RUN nuitka --onefile --standalone /src/main.py
 
 # Test the executable
-ENTRYPOINT ["/src/main.exe", "--version"]
+ENTRYPOINT ["/src/main.bin", "--version"]
 ```
 
 The run the following commands:
@@ -92,10 +92,10 @@ The run the following commands:
 docker build -t nuitka-compiler-my_project:latest .
 
 # Turn the image into a container
-docker run --name nuitka-compiler-my_project
+docker run --name nuitka-compiler-my_project nuitka-compiler-my_project:latest
 
 # Copy the executable out of the container
-docker cp nuitka-compiler-my_project:/src/main.exe main.exe
+docker cp nuitka-compiler-my_project:/src/main.bin main.bin
 
 # Delete the container and image
 docker rm nuitka-compiler-my_project
