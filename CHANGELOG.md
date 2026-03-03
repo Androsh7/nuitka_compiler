@@ -10,7 +10,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Zstandard package to docker image
+- Option to configure parallelism
 - License (whoops)
+
+### Changed
+
+- Docker images pull cpython from git instead of python ftp
 
 ## [0.1.0]
 
