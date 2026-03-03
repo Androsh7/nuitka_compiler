@@ -37,10 +37,7 @@ ca-certificates \
 
 # Build OpenSSL from source
 ARG OPENSSL_VERSION="3.0.18"
-# Clone cpython before OpenSSL build
-ARG PYTHON_VERSION="3.13"
-RUN git clone --branch ${PYTHON_VERSION} --single-branch --depth 1 https://github.com/python/cpython.git \
-&& curl -fsSLO "https://www.openssl.org/source/openssl-${OPENSSL_VERSION}.tar.gz" \
+RUN curl -fsSLO "https://www.openssl.org/source/openssl-${OPENSSL_VERSION}.tar.gz" \
 && tar -xzf "openssl-${OPENSSL_VERSION}.tar.gz" \
 && cd "openssl-${OPENSSL_VERSION}" \
 && export LDFLAGS="-Wl,-rpath,/opt/openssl/lib" \
@@ -53,14 +50,14 @@ shared zlib \
 && make install_sw \
 && LD_LIBRARY_PATH=/opt/openssl/lib /opt/openssl/bin/openssl version -a \
 && /opt/openssl/bin/openssl version -a \
-&& rm -rf /src/openssl*
-
-# Set OpenSSL environment variables
-ENV OPENSSL_ROOT=/opt/openssl
-ENV PATH="${OPENSSL_ROOT}/bin:${PATH}"
+&& rm -rf /src/*
 
 # Build Python from source
-RUN cd cpython \
+ARG PYTHON_VERSION="3.13"
+RUN git clone --branch ${PYTHON_VERSION} --single-branch --depth 1 https://github.com/python/cpython.git \
+&& cd cpython \
+&& export OPENSSL_ROOT=/opt/openssl \
+&& export PATH="${OPENSSL_ROOT}/bin:${PATH}" \
 && export CPPFLAGS="-I${OPENSSL_ROOT}/include" \
 && export LDFLAGS="-L${OPENSSL_ROOT}/lib -Wl,-rpath,${OPENSSL_ROOT}/lib" \
 && export CFLAGS="-O2 -pipe" \
