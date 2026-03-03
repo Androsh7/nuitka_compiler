@@ -22,11 +22,11 @@ LIBC_TO_DOCKERFILE = [
     ),
 ]
 ARCHITECTURES = ["x86_64", "aarch64"]
-PYTHON_VERSIONS = ["3.9.24", "3.10.19", "3.11.14", "3.12.12", "3.13.11", "3.14.2"]
+PYTHON_VERSIONS = ["3.9", "3.10", "3.11", "3.12", "3.13", "3.14"]
 OPENSSL_VERSION = "3.0.18"
 NAMESPACE = "androsh7"
 SOURCE_URL = "https://github.com/Androsh7/nuitka_compiler_images"
-PARALLELISM = 4
+DEFAULT_PARALLELISM = 4
 # --------------------------------------------------------------------------------- #
 # ================================= CONFIGURATION ================================= #
 # --------------------------------------------------------------------------------- #

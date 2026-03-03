@@ -1,6 +1,7 @@
 """Builds docker images"""
 
 # Standard libraries
+import argparse
 import os
 import subprocess
 import sys
@@ -14,7 +15,7 @@ from config import (
     LIBC_TO_DOCKERFILE,
     NAMESPACE,
     OPENSSL_VERSION,
-    PARALLELISM,
+    DEFAULT_PARALLELISM,
     PARENT_DIRECTORY,
     PYTHON_VERSIONS,
     SOURCE_URL,
@@ -106,11 +107,19 @@ def build_docker_bake_file(build_images: list[ImageSpec]) -> Path:
 
 def main():
     """Build docker images"""
+    parser = argparse.ArgumentParser(prog="build.py")
+    parser.add_argument("--version", action="version", version=f"Nuitka Compiler Images v{VERSION}")
+    parser.add_argument("--show-build-steps", action="store_true", help="Displays the python build steps")
+    parser.add_argument("--parallelism", type=int, default=DEFAULT_PARALLELISM, help=f"Number of simultaneous builds that can run, default {DEFAULT_PARALLELISM}")
+    args = parser.parse_args()
 
     # Login to docker hub
     print("Logging in to Docker Hub", file=sys.stderr)
+    if (docker_password := os.environ.get("DOCKER_PASSWORD")) is None or (docker_username := os.environ.get("DOCKER_USERNAME")) is None:
+        docker_username = input("Docker username: ")
+        docker_password = input("Docker PAT token: ")
     subprocess.run(
-        f"echo {os.environ['DOCKER_PASSWORD']} | docker login -u {os.environ['DOCKER_USERNAME']} --password-stdin",
+        f"echo {docker_password} | docker login -u {docker_username} --password-stdin",
         shell=True,
         check=True,
     )
@@ -145,7 +154,7 @@ def main():
     build_list = []
     for index, image in enumerate(BUILD_IMAGES, start=1):
         build_list.append(image)
-        if len(build_list) == PARALLELISM or index == len(BUILD_IMAGES):
+        if len(build_list) == args.parallelism or index == len(BUILD_IMAGES):
             # Log start
             print(
                 f"Building images {index - len(build_list) + 1}-{index} out of {len(BUILD_IMAGES)} images",
@@ -168,7 +177,7 @@ def main():
                     "--file",
                     str(bake_file_path),
                     "--push",
-                    "--progress=quiet",
+                    f'--progress={"auto" if args.show_build_steps else "quiet"}',
                 ],
                 check=True,
             )
