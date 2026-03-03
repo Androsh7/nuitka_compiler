@@ -35,17 +35,16 @@ gdbm-devel \
 expat-devel \
 libuuid-devel \
 ca-certificates \
-tar \
-gzip \
-zip \
-unzip \
 && update-ca-trust \
 && yum -y clean all \
 && rm -rf /var/cache/yum
 
 # Build OpenSSL from source
 ARG OPENSSL_VERSION="3.0.18"
-RUN curl -fsSLO "https://www.openssl.org/source/openssl-${OPENSSL_VERSION}.tar.gz" \
+# Clone cpython before OpenSSL build
+ARG PYTHON_VERSION="3.13"
+RUN git clone --branch ${PYTHON_VERSION} --single-branch --depth 1 https://github.com/python/cpython.git \
+&& curl -fsSLO "https://www.openssl.org/source/openssl-${OPENSSL_VERSION}.tar.gz" \
 && tar -xzf "openssl-${OPENSSL_VERSION}.tar.gz" \
 && cd "openssl-${OPENSSL_VERSION}" \
 && ./config \
@@ -57,7 +56,7 @@ shared zlib \
 && { echo "/opt/openssl/lib64"; echo "/opt/openssl/lib"; } > /etc/ld.so.conf.d/openssl.conf \
 && ldconfig \
 && /opt/openssl/bin/openssl version -a \
-&& rm -rf /src/*
+&& rm -rf /src/openssl*
 
 # Set OpenSSL environment variables
 ENV OPENSSL_ROOT=/opt/openssl
@@ -65,10 +64,7 @@ ENV PATH="${OPENSSL_ROOT}/bin:${PATH}"
 ENV LD_LIBRARY_PATH="${OPENSSL_ROOT}/lib64:${OPENSSL_ROOT}/lib:${LD_LIBRARY_PATH}"
 
 # Build Python from source
-ARG PYTHON_VERSION="3.13.11"
-RUN curl -fsSLO "https://www.python.org/ftp/python/${PYTHON_VERSION}/Python-${PYTHON_VERSION}.tgz" \
-&& tar -xzf "Python-${PYTHON_VERSION}.tgz" \
-&& cd "Python-${PYTHON_VERSION}" \
+RUN cd cpython \
 && export CPPFLAGS="-I${OPENSSL_ROOT}/include" \
 && OPENSSL_LIBDIR="" \
 && if [ -d "${OPENSSL_ROOT}/lib64" ] && ls "${OPENSSL_ROOT}/lib64"/libssl.so* >/dev/null 2>&1; then \
