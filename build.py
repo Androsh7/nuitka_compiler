@@ -139,7 +139,7 @@ def main():
             for python_version in PYTHON_VERSIONS:
                 BUILD_IMAGES.append(
                     ImageSpec(
-                        tag=f"{architecture}-{libc}-py{python_version.rsplit('.', 1)[0]}",
+                        tag=f"{architecture}-{libc}-py{python_version}",
                         dockerfile=dockerfile,
                         architecture=architecture,
                         build_args={
