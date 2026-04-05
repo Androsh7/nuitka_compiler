@@ -48,7 +48,7 @@ docker cp /path/to/project/files nuitka-compiler:/src
 docker exec nuitka-compiler pip install -r /src/requirements.txt
 
 # Run nuitka build
-docker exec nuitka-compiler python3 -m nuitka --standalone --onefile /src/main.py
+docker exec nuitka-compiler python3 -m nuitka --standalone --onefile /src/main.py --output-filename=/src/main.bin
 
 # Copy out executable
 docker cp nuitka-compiler:/src/main.bin main.bin
@@ -79,7 +79,7 @@ COPY /your/project/files /src
 RUN pip install -r /src/requirements.txt
 
 # Build executable
-RUN nuitka --onefile --standalone /src/main.py
+RUN nuitka --onefile --standalone /src/main.py --output-filename=/src/main.bin
 
 # Test the executable
 ENTRYPOINT ["/src/main.bin", "--version"]
