@@ -33,10 +33,6 @@ expat-dev \
 util-linux-dev \
 libuuid \
 ca-certificates \
-tar \
-gzip \
-zip \
-unzip \
 && update-ca-certificates
 
 # Build OpenSSL from source
@@ -56,15 +52,12 @@ shared zlib \
 && /opt/openssl/bin/openssl version -a \
 && rm -rf /src/*
 
-# Set OpenSSL environment variables
-ENV OPENSSL_ROOT=/opt/openssl
-ENV PATH="${OPENSSL_ROOT}/bin:${PATH}"
-
 # Build Python from source
-ARG PYTHON_VERSION="3.13.11"
-RUN curl -fsSLO https://www.python.org/ftp/python/${PYTHON_VERSION}/Python-${PYTHON_VERSION}.tgz \
-&& tar -xzf Python-${PYTHON_VERSION}.tgz \
-&& cd Python-${PYTHON_VERSION} \
+ARG PYTHON_VERSION="3.13"
+RUN git clone --branch ${PYTHON_VERSION} --single-branch --depth 1 https://github.com/python/cpython.git \
+&& cd cpython \
+&& export OPENSSL_ROOT=/opt/openssl \
+&& export PATH="${OPENSSL_ROOT}/bin:${PATH}" \
 && export CPPFLAGS="-I${OPENSSL_ROOT}/include" \
 && export LDFLAGS="-L${OPENSSL_ROOT}/lib -Wl,-rpath,${OPENSSL_ROOT}/lib" \
 && export CFLAGS="-O2 -pipe" \
@@ -83,6 +76,10 @@ RUN curl -fsSLO https://www.python.org/ftp/python/${PYTHON_VERSION}/Python-${PYT
 && make -j"$(nproc)" profile-opt \
 PROFILE_TASK='-m test --pgo -x test_re' \
 && make install \
+&& printf '#!/bin/bash\npython3 -m pip "$@"\n' > /usr/local/bin/pip \
+&& chmod +x /usr/local/bin/pip \
+&& printf '#!/bin/bash\npython3 -m nuitka "$@"\n' > /usr/local/bin/nuitka \
+&& chmod +x /usr/local/bin/nuitka \
 && rm -rf /src/*
 
 # Set Python environment variables
@@ -90,11 +87,11 @@ ENV PATH=/opt/python-${PYTHON_VERSION}/bin:${PATH}
 ENV LDFLAGS="-lintl"
 
 # Update pip, setuptools, wheel, and install/test nuitka
-RUN python3 -m pip install --upgrade pip setuptools wheel \ 
-&& python3 -m pip install nuitka \
+RUN pip install --upgrade pip setuptools wheel \ 
+&& pip install nuitka zstandard \
 # Compile a test file to verify nuitka works
 && echo 'print("Nuitka is working!")' > test_nuitka.py \
-&& python3 -m nuitka --standalone --onefile --output-file=/src/test_nuitka_compiled.bin test_nuitka.py \
+&& nuitka --standalone --onefile --output-file=/src/test_nuitka_compiled.bin test_nuitka.py \
 && chmod +x /src/test_nuitka_compiled.bin \
 && /src/test_nuitka_compiled.bin \
 && rm -rf /src/*

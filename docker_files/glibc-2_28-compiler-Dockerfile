@@ -34,10 +34,6 @@ gdbm-devel \
 expat-devel \
 libuuid-devel \
 ca-certificates \
-tar \
-gzip \
-zip \
-unzip \
 && update-ca-trust \
 && yum -y clean all \
 && rm -rf /var/cache/yum
@@ -58,16 +54,13 @@ shared zlib \
 && /opt/openssl/bin/openssl version -a \
 && rm -rf /src/*
 
-# Set OpenSSL environment variables
-ENV OPENSSL_ROOT=/opt/openssl
-ENV PATH="${OPENSSL_ROOT}/bin:${PATH}"
-ENV LD_LIBRARY_PATH="${OPENSSL_ROOT}/lib64:${OPENSSL_ROOT}/lib:${LD_LIBRARY_PATH}"
-
 # Build Python from source
-ARG PYTHON_VERSION="3.13.11"
-RUN curl -fsSLO "https://www.python.org/ftp/python/${PYTHON_VERSION}/Python-${PYTHON_VERSION}.tgz" \
-&& tar -xzf "Python-${PYTHON_VERSION}.tgz" \
-&& cd "Python-${PYTHON_VERSION}" \
+ARG PYTHON_VERSION="3.13"
+RUN git clone --branch ${PYTHON_VERSION} --single-branch --depth 1 https://github.com/python/cpython.git \
+&& export OPENSSL_ROOT=/opt/openssl \
+&& export PATH="${OPENSSL_ROOT}/bin:${PATH}" \
+&& export LD_LIBRARY_PATH="${OPENSSL_ROOT}/lib64:${OPENSSL_ROOT}/lib:${LD_LIBRARY_PATH}" \
+&& cd cpython \
 && export CPPFLAGS="-I${OPENSSL_ROOT}/include" \
 && OPENSSL_LIBDIR="" \
 && if [ -d "${OPENSSL_ROOT}/lib64" ] && ls "${OPENSSL_ROOT}/lib64"/libssl.so* >/dev/null 2>&1; then \
@@ -88,16 +81,20 @@ fi \
 --with-lto \
 && make -j"$(nproc)" profile-opt \
 && make install \
+&& printf '#!/bin/bash\npython3 -m pip "$@"\n' > /usr/local/bin/pip \
+&& chmod +x /usr/local/bin/pip \
+&& printf '#!/bin/bash\npython3 -m nuitka "$@"\n' > /usr/local/bin/nuitka \
+&& chmod +x /usr/local/bin/nuitka \
 && rm -rf /src/*
 
 ENV PATH=/opt/python-${PYTHON_VERSION}/bin:${PATH}
 
 # Update pip, setuptools, wheel, and install/test nuitka
-RUN python3 -m pip install --upgrade pip setuptools wheel \ 
-&& python3 -m pip install nuitka \
+RUN pip install --upgrade pip setuptools wheel \ 
+&& pip install nuitka zstandard \
 # Compile a test file to verify nuitka works
 && echo 'print("Nuitka is working!")' > test_nuitka.py \
-&& python3 -m nuitka --standalone --onefile --output-file=/src/test_nuitka_compiled.bin test_nuitka.py \
+&& nuitka --standalone --onefile --output-file=/src/test_nuitka_compiled.bin test_nuitka.py \
 && chmod +x /src/test_nuitka_compiled.bin \
 && /src/test_nuitka_compiled.bin \
 && rm -rf /src/*
