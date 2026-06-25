@@ -40,11 +40,13 @@ class ImageSpec:
     build_args: dict[str, str] | None = None
 
 
-def build_docker_bake_file(build_images: list[ImageSpec]) -> Path:
+def build_docker_bake_file(build_images: list[ImageSpec], registries: list[str]) -> Path:
     """Creates a docker bake file based on the list of images
 
     Args:
         build_images: list of images to build
+        registries: list of registry/namespace prefixes; one tag pair is
+            emitted per registry (e.g. ``ghcr.io/androsh7``, ``docker.io/androsh7``)
 
     Returns:
         Path to the generated docker bake file
@@ -65,9 +67,11 @@ def build_docker_bake_file(build_images: list[ImageSpec]) -> Path:
             bake_file.write(
                 f'  dockerfile = "{image_spec.dockerfile}"\n'.replace("\\", "/")
             )
-            bake_file.write(
-                f'  tags = ["{NAMESPACE}/nuitka-compiler:{VERSION}-{image_spec.tag}", "{NAMESPACE}/nuitka-compiler:latest-{image_spec.tag}"]\n'
-            )
+            tag_entries = []
+            for registry in registries:
+                tag_entries.append(f'"{registry}/nuitka-compiler:{VERSION}-{image_spec.tag}"')
+                tag_entries.append(f'"{registry}/nuitka-compiler:latest-{image_spec.tag}"')
+            bake_file.write(f'  tags = [{", ".join(tag_entries)}]\n')
             bake_file.write(
                 f'  platforms = ["linux/{"arm64" if image_spec.architecture == "aarch64" else "amd64"}"]\n'
             )
@@ -110,19 +114,23 @@ def main():
     parser = argparse.ArgumentParser(prog="build.py")
     parser.add_argument("--version", action="version", version=f"Nuitka Compiler Images v{VERSION}")
     parser.add_argument("--show-build-steps", action="store_true", help="Displays the python build steps")
+    parser.add_argument("--skip-arm-build", action="store_true", help="Skips all ARM builds")
     parser.add_argument("--parallelism", type=int, default=DEFAULT_PARALLELISM, help=f"Number of simultaneous builds that can run, default {DEFAULT_PARALLELISM}")
+    parser.add_argument("--push", action="store_true", help="Push images to the configured registries")
+    parser.add_argument(
+        "--registry",
+        action="append",
+        dest="registries",
+        metavar="REGISTRY",
+        help=(
+            "Registry/namespace prefix to publish under "
+            "(e.g. ghcr.io/androsh7, docker.io/androsh7). May be passed multiple "
+            f"times. Defaults to '{NAMESPACE}' when omitted."
+        ),
+    )
     args = parser.parse_args()
 
-    # Login to docker hub
-    print("Logging in to Docker Hub", file=sys.stderr)
-    if (docker_password := os.environ.get("DOCKER_PASSWORD")) is None or (docker_username := os.environ.get("DOCKER_USERNAME")) is None:
-        docker_username = input("Docker username: ")
-        docker_password = input("Docker PAT token: ")
-    subprocess.run(
-        f"echo {docker_password} | docker login -u {docker_username} --password-stdin",
-        shell=True,
-        check=True,
-    )
+    registries = args.registries if args.registries else [NAMESPACE]
 
     # Create buildx constants
     os.environ["BUILDX_BAKE_ENTITLEMENTS_FS"] = "0"
@@ -136,6 +144,8 @@ def main():
     BUILD_IMAGES = []
     for libc, dockerfile in LIBC_TO_DOCKERFILE:
         for architecture in ARCHITECTURES:
+            if architecture == "aarch64" and args.skip_arm_build:
+                continue
             for python_version in PYTHON_VERSIONS:
                 BUILD_IMAGES.append(
                     ImageSpec(
@@ -166,21 +176,20 @@ def main():
             print("\n", file=sys.stderr)
 
             # Create bake file
-            bake_file_path = build_docker_bake_file(build_list)
+            bake_file_path = build_docker_bake_file(build_list, registries)
 
-            # Build and push images using docker bake
-            subprocess.run(
-                [
-                    "docker",
-                    "bake",
-                    *buildx_allow_list,
-                    "--file",
-                    str(bake_file_path),
-                    "--push",
-                    f'--progress={"auto" if args.show_build_steps else "quiet"}',
-                ],
-                check=True,
-            )
+            # Build (and optionally push) images using docker bake
+            bake_cmd = [
+                "docker",
+                "bake",
+                *buildx_allow_list,
+                "--file",
+                str(bake_file_path),
+                f'--progress={"auto" if args.show_build_steps else "quiet"}',
+            ]
+            if args.push:
+                bake_cmd.append("--push")
+            subprocess.run(bake_cmd, check=True)
 
             # Log completion
             print(
@@ -193,10 +202,6 @@ def main():
 
             # Clear the build list
             build_list.clear()
-
-    # Logout from docker hub
-    print("Logging out from Docker Hub", file=sys.stderr)
-    subprocess.run("docker logout", shell=True, check=True)
 
 
 if __name__ == "__main__":

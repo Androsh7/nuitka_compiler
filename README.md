@@ -8,7 +8,7 @@ This repository builds and publishes a matrix of Docker images designed for **Nu
 
 | field        | options                                       |
 | ------------ | --------------------------------------------- |
-| version      | `latest`, `0.1.0`, `0.2.0`                    |
+| version      | `latest`, `0.1.0`, `0.2.0`, `0.3.0`           |
 | architecture | `x86_64`, `aarch64`                           |
 | libc         | `glibc-2.17`, `glibc-2.28`, `musl-1.2`        |
 | python       | `3.14`, `3.13`, `3.12`, `3.11`, `3.10`, `3.9` |
@@ -17,7 +17,7 @@ Examples:
 
 - `androsh7/nuitka-compiler:latest-x86_64-glibc-2.17-py3.13`
 - `androsh7/nuitka-compiler:latest-x86_64-glibc-2.28-py3.11`
-- `androsh7/nuitka-compiler:0.2.0-aarch64-musl-1.2-py3.11`
+- `androsh7/nuitka-compiler:0.3.0-aarch64-musl-1.2-py3.11`
 
 ## Why does this exist?
 
