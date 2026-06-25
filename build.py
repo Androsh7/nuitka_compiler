@@ -181,6 +181,7 @@ def main():
             # Build (and optionally push) images using docker bake
             bake_cmd = [
                 "docker",
+                "buildx",
                 "bake",
                 *buildx_allow_list,
                 "--file",
