@@ -2,34 +2,120 @@ name: Build and publish images
 
 on:
   push:
+    branches:
+      - main
     tags:
       - "v*"
+  pull_request:
   schedule:
-    # Approximates a biweekly cadence (1st and 15th of each month, 00:00 UTC).
     - cron: "0 0 1,15 * *"
   workflow_dispatch:
+    inputs:
+      push:
+        description: "Push the built images to the configured registries"
+        type: boolean
+        default: false
+
+# Supersede in-flight runs for the same reference on pull requests only
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
 
 jobs:
-  build-and-publish:
+  # One date for the whole run, so the dated tag identifies a complete set of
+  # images even when the matrix spans midnight UTC.
+  prepare:
+    name: Prepare
     runs-on: ubuntu-latest
+    outputs:
+      build_date: ${{ steps.stamp.outputs.build_date }}
+    steps:
+      - name: Determine build date
+        id: stamp
+        run: |
+          set -euo pipefail
+          build_date="$(date -u +%Y%m%d)"
+          echo "build_date=$build_date" >> "$GITHUB_OUTPUT"
+          echo "build date: $build_date" >> "$GITHUB_STEP_SUMMARY"
+
+  build:
+    name: ${{ matrix.arch }} · ${{ matrix.libc }} · py${{ matrix.python }}
+    needs: prepare
+    # ubuntu-24.04-arm is free and generally available for public repositories only.
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 300
     permissions:
       contents: read
       packages: write
+    strategy:
+      fail-fast: false
+      matrix:
+        # These values must match LIBC_TO_DOCKERFILE, PYTHON_VERSIONS and
+        # ARCHITECTURES in config.py. build.py rejects anything else.
+        libc: ["glibc-2.17", "glibc-2.28", "musl-1.2"]
+        python: ["3.9", "3.10", "3.11", "3.12", "3.13", "3.14"]
+        arch: ["x86_64", "aarch64"]
+        include:
+          - arch: "x86_64"
+            runner: "ubuntu-latest"
+          - arch: "aarch64"
+            runner: "ubuntu-24.04-arm"
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.x"
+          python-version: "3.12"
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
+      # The secrets context is unavailable in a step level, so the publish
+      # decision is made here and re-exported as plain step outputs.
+      - name: Decide whether to push
+        id: decide
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          REF_TYPE: ${{ github.ref_type }}
+          DISPATCH_PUSH: ${{ inputs.push }}
+          # Owner rather than full name, so a repository rename cannot silently
+          # turn publishing off. A fork always has a different owner.
+          IS_UPSTREAM: ${{ github.repository_owner == 'Androsh7' }}
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          enabled=false
+          case "$EVENT_NAME" in
+            push)
+              if [ "$REF_TYPE" = "tag" ]; then enabled=true; fi
+              ;;
+            schedule)
+              enabled=true
+              ;;
+            workflow_dispatch)
+              if [ "$DISPATCH_PUSH" = "true" ]; then enabled=true; fi
+              ;;
+          esac
+          # Forks have no registry credentials and a read-only GITHUB_TOKEN.
+          if [ "$IS_UPSTREAM" != "true" ]; then enabled=false; fi
+
+          dockerhub=false
+          if [ "$enabled" = "true" ] && [ -n "$DOCKERHUB_USERNAME" ] && [ -n "$DOCKERHUB_TOKEN" ]; then
+            dockerhub=true
+          fi
+
+          echo "enabled=$enabled" >> "$GITHUB_OUTPUT"
+          echo "dockerhub=$dockerhub" >> "$GITHUB_OUTPUT"
+          echo "push=$enabled dockerhub=$dockerhub" >> "$GITHUB_STEP_SUMMARY"
+
       - name: Log in to GHCR
+        if: steps.decide.outputs.enabled == 'true'
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
@@ -37,15 +123,51 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Log in to Docker Hub
+        if: steps.decide.outputs.dockerhub == 'true'
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Build and push non-ARM images
+      - name: Report available disk space
+        run: df -h /
+
+      - name: Build image
+        env:
+          MATRIX_LIBC: ${{ matrix.libc }}
+          MATRIX_PYTHON: ${{ matrix.python }}
+          MATRIX_ARCH: ${{ matrix.arch }}
+          BUILD_DATE: ${{ needs.prepare.outputs.build_date }}
+          PUSH_ENABLED: ${{ steps.decide.outputs.enabled }}
+          DOCKERHUB_ENABLED: ${{ steps.decide.outputs.dockerhub }}
         run: |
-          python build.py \
-            --push \
-            --skip-arm-build \
-            --registry ghcr.io/androsh7 \
-            --registry docker.io/androsh7
+          set -euo pipefail
+          build_arguments=(
+            --libc "$MATRIX_LIBC"
+            --python "$MATRIX_PYTHON"
+            --architecture "$MATRIX_ARCH"
+            --build-date "$BUILD_DATE"
+            --progress plain
+            --registry ghcr.io/androsh7
+          )
+          if [ "$DOCKERHUB_ENABLED" = "true" ]; then
+            build_arguments+=(--registry docker.io/androsh7)
+          fi
+          if [ "$PUSH_ENABLED" = "true" ]; then
+            build_arguments+=(--push)
+          fi
+          python build.py "${build_arguments[@]}"
+
+  # fail-fast is off, so a single broken image otherwise leaves 35 green jobs
+  # and an ambiguous overall run status.
+  result:
+    name: Build result
+    needs: build
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fail if any image failed
+        if: needs.build.result != 'success'
+        run: |
+          echo "At least one image failed to build" >&2
+          exit 1
