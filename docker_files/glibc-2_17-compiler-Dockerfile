@@ -1,5 +1,5 @@
 ARG ARCHITECTURE="x86_64"
-FROM quay.io/pypa/manylinux2014_${ARCHITECTURE}:latest
+FROM quay.io/pypa/manylinux2014_${ARCHITECTURE}:2026.09.05-1
 
 WORKDIR /src
 
@@ -41,7 +41,7 @@ ca-certificates \
 
 # Build OpenSSL from source
 ARG OPENSSL_VERSION="3.0.18"
-RUN curl -fsSLO "https://www.openssl.org/source/openssl-${OPENSSL_VERSION}.tar.gz" \
+RUN curl -fsSLO "https://github.com/openssl/openssl/releases/download/openssl-${OPENSSL_VERSION}/openssl-${OPENSSL_VERSION}.tar.gz" \
 && tar -xzf "openssl-${OPENSSL_VERSION}.tar.gz" \
 && cd "openssl-${OPENSSL_VERSION}" \
 && ./config \
