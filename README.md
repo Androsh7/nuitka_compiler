@@ -6,9 +6,15 @@ This repository builds and publishes a matrix of Docker images designed for **Nu
 
 `androsh7/nuitka-compiler:<VERSION>-<architecture>-<libc>-py<python>`
 
+Every image is published to both Docker Hub and the GitHub Container
+Registry. The two are identical, pick whichever you prefer:
+
+- `docker.io/androsh7/nuitka-compiler:...`
+- `ghcr.io/androsh7/nuitka-compiler:...`
+
 | field        | options                                       |
 | ------------ | --------------------------------------------- |
-| version      | `latest`, `0.1.0`, `0.2.0`, `0.3.0`           |
+| version      | `latest`, `0.1.0`, `0.2.0`, `0.3.0`, `0.4.0`  |
 | architecture | `x86_64`, `aarch64`                           |
 | libc         | `glibc-2.17`, `glibc-2.28`, `musl-1.2`        |
 | python       | `3.14`, `3.13`, `3.12`, `3.11`, `3.10`, `3.9` |
