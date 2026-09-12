@@ -68,7 +68,9 @@ jobs:
           EVENT_NAME: ${{ github.event_name }}
           REF_TYPE: ${{ github.ref_type }}
           DISPATCH_PUSH: ${{ inputs.push }}
-          IS_UPSTREAM: ${{ github.repository == 'Androsh7/nuitka_compiler_images' }}
+          # Owner rather than full name, so a repository rename cannot silently
+          # turn publishing off. A fork always has a different owner.
+          IS_UPSTREAM: ${{ github.repository_owner == 'Androsh7' }}
           DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
           DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
         run: |
