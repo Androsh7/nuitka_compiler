@@ -1,5 +1,5 @@
 ARG ARCHITECTURE="x86_64"
-FROM quay.io/pypa/manylinux2014_${ARCHITECTURE}:2026.09.05-1
+FROM quay.io/pypa/manylinux2014_${ARCHITECTURE}:latest
 
 WORKDIR /src
 

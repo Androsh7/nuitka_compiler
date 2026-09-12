@@ -19,7 +19,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - OpenSSL is fetched from the openssl GitHub releases instead of www.openssl.org
-- Base images are pinned to a dated tag instead of `latest`
 - Docker Hub publishing is skipped when its credentials are absent, so forks build without secrets
 - Registry logins only run when the workflow is publishing
 - `--show-build-steps` is superseded by `--progress`, it remains supported as a shorthand for `--progress auto`
