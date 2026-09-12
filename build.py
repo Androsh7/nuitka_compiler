@@ -40,13 +40,34 @@ class ImageSpec:
     build_args: dict[str, str] | None = None
 
 
-def build_docker_bake_file(build_images: list[ImageSpec], registries: list[str]) -> Path:
+def parse_build_date(build_date: str) -> datetime:
+    """The date to stamp built images with, read from its compact form
+
+    Args:
+        build_date: The date in YYYYMMDD form
+
+    Returns:
+        The parsed date, at midnight UTC
+
+    Raises:
+        argparse.ArgumentTypeError: If the value is not a valid YYYYMMDD date
+    """
+    try:
+        return datetime.strptime(build_date, "%Y%m%d").replace(tzinfo=timezone.utc)
+    except ValueError as error:
+        raise argparse.ArgumentTypeError(f"{build_date!r} is not a YYYYMMDD date") from error
+
+
+def build_docker_bake_file(
+    build_images: list[ImageSpec], registries: list[str], build_date: datetime
+) -> Path:
     """Creates a docker bake file based on the list of images
 
     Args:
         build_images: list of images to build
-        registries: list of registry/namespace prefixes; one tag pair is
+        registries: list of registry/namespace prefixes; one tag trio is
             emitted per registry (e.g. ``ghcr.io/androsh7``, ``docker.io/androsh7``)
+        build_date: the date the images are stamped and tagged with
 
     Returns:
         Path to the generated docker bake file
@@ -68,6 +89,10 @@ def build_docker_bake_file(build_images: list[ImageSpec], registries: list[str])
             for registry in registries:
                 tag_entries.append(f'"{registry}/nuitka-compiler:{VERSION}-{image_spec.tag}"')
                 tag_entries.append(f'"{registry}/nuitka-compiler:latest-{image_spec.tag}"')
+                tag_entries.append(
+                    f'"{registry}/nuitka-compiler:'
+                    f'{VERSION}-{build_date.strftime("%Y%m%d")}-{image_spec.tag}"'
+                )
             bake_file.write(f'  tags = [{", ".join(tag_entries)}]\n')
             bake_file.write(
                 f'  platforms = ["linux/{"arm64" if image_spec.architecture == "aarch64" else "amd64"}"]\n'
@@ -91,7 +116,7 @@ def build_docker_bake_file(build_images: list[ImageSpec], registries: list[str])
                 f'    "openssl-version" = "{image_spec.build_args.get("OPENSSL_VERSION", "not specified")}"\n'
             )
             bake_file.write(
-                f'    "build-date" = "{datetime.now(timezone.utc).strftime("%Y-%m-%d")}"\n'
+                f'    "build-date" = "{build_date.strftime("%Y-%m-%d")}"\n'
             )
             bake_file.write('    "base-image-maintainer" = "The ManyLinux project"\n')
             bake_file.write("  }\n")
@@ -193,6 +218,17 @@ def main():
         ),
     )
     parser.add_argument(
+        "--build-date",
+        type=parse_build_date,
+        default=parse_build_date(datetime.now(timezone.utc).strftime("%Y%m%d")),
+        metavar="YYYYMMDD",
+        help=(
+            "Date used for the dated image tag and the build-date label. "
+            "Defaults to today in UTC. Pass one value across a matrix build so "
+            "every image shares a tag even if the build spans midnight"
+        ),
+    )
+    parser.add_argument(
         "--progress",
         choices=["auto", "plain", "tty", "quiet"],
         default=None,
@@ -254,7 +290,7 @@ def main():
             print("\n", file=sys.stderr)
 
             # Create bake file
-            bake_file_path = build_docker_bake_file(build_list, registries)
+            bake_file_path = build_docker_bake_file(build_list, registries, args.build_date)
 
             # Build (and optionally push) images using docker bake
             bake_cmd = [

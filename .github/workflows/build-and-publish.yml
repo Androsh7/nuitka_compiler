@@ -25,8 +25,25 @@ permissions:
   contents: read
 
 jobs:
+  # One date for the whole run, so the dated tag identifies a complete set of
+  # images even when the matrix spans midnight UTC.
+  prepare:
+    name: Prepare
+    runs-on: ubuntu-latest
+    outputs:
+      build_date: ${{ steps.stamp.outputs.build_date }}
+    steps:
+      - name: Determine build date
+        id: stamp
+        run: |
+          set -euo pipefail
+          build_date="$(date -u +%Y%m%d)"
+          echo "build_date=$build_date" >> "$GITHUB_OUTPUT"
+          echo "build date: $build_date" >> "$GITHUB_STEP_SUMMARY"
+
   build:
     name: ${{ matrix.arch }} · ${{ matrix.libc }} · py${{ matrix.python }}
+    needs: prepare
     # ubuntu-24.04-arm is free and generally available for public repositories only.
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 300
@@ -120,6 +137,7 @@ jobs:
           MATRIX_LIBC: ${{ matrix.libc }}
           MATRIX_PYTHON: ${{ matrix.python }}
           MATRIX_ARCH: ${{ matrix.arch }}
+          BUILD_DATE: ${{ needs.prepare.outputs.build_date }}
           PUSH_ENABLED: ${{ steps.decide.outputs.enabled }}
           DOCKERHUB_ENABLED: ${{ steps.decide.outputs.dockerhub }}
         run: |
@@ -128,6 +146,7 @@ jobs:
             --libc "$MATRIX_LIBC"
             --python "$MATRIX_PYTHON"
             --architecture "$MATRIX_ARCH"
+            --build-date "$BUILD_DATE"
             --progress plain
             --registry ghcr.io/androsh7
           )

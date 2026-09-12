@@ -15,6 +15,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `--libc`, `--python` and `--architecture` filters for building a subset of the matrix
 - `--progress` flag for selecting the docker buildx progress output mode
 - `push` input on the manual workflow trigger for publishing on demand
+- Immutable `<VERSION>-<YYYYMMDD>-` image tag, so a scheduled rebuild never changes an existing pin
+- `--build-date` flag for stamping a whole matrix build with one date
 
 ### Changed
 

@@ -25,6 +25,21 @@ Examples:
 - `androsh7/nuitka-compiler:latest-x86_64-glibc-2.28-py3.11`
 - `androsh7/nuitka-compiler:0.3.0-aarch64-musl-1.2-py3.11`
 
+Each image is published under three tags:
+
+| tag | moves? | use it when |
+| --- | ------ | ----------- |
+| `latest-<arch>-<libc>-py<python>` | every publish | you always want the newest build |
+| `<VERSION>-<arch>-<libc>-py<python>` | on every rebuild of that version | you want a given release, rebuilt with current base images |
+| `<VERSION>-<YYYYMMDD>-<arch>-<libc>-py<python>` | never | you need a byte-for-byte reproducible pin |
+
+Scheduled runs rebuild and republish the first two, so a `<VERSION>-` tag
+changes content over time. Pin the dated tag if that matters to you:
+
+```
+androsh7/nuitka-compiler:0.4.0-20260912-x86_64-glibc-2.17-py3.13
+```
+
 ## Why does this exist?
 
 I love nuitka, it creates compact, fast, and portable python executables however it makes CI/CD a bit tricky.
