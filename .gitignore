@@ -7,3 +7,6 @@ __pycache__/
 
 # Project
 *.hcl
+
+# Tooling
+.ruff_cache/

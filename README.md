@@ -6,9 +6,15 @@ This repository builds and publishes a matrix of Docker images designed for **Nu
 
 `androsh7/nuitka-compiler:<VERSION>-<architecture>-<libc>-py<python>`
 
+Every image is published to both Docker Hub and the GitHub Container
+Registry. The two are identical, pick whichever you prefer:
+
+- `docker.io/androsh7/nuitka-compiler:...`
+- `ghcr.io/androsh7/nuitka-compiler:...`
+
 | field        | options                                       |
 | ------------ | --------------------------------------------- |
-| version      | `latest`, `0.1.0`, `0.2.0`, `0.3.0`           |
+| version      | `latest`, `0.1.0`, `0.2.0`, `0.3.0`, `0.4.0`  |
 | architecture | `x86_64`, `aarch64`                           |
 | libc         | `glibc-2.17`, `glibc-2.28`, `musl-1.2`        |
 | python       | `3.14`, `3.13`, `3.12`, `3.11`, `3.10`, `3.9` |
@@ -16,8 +22,46 @@ This repository builds and publishes a matrix of Docker images designed for **Nu
 Examples:
 
 - `androsh7/nuitka-compiler:latest-x86_64-glibc-2.17-py3.13`
-- `androsh7/nuitka-compiler:latest-x86_64-glibc-2.28-py3.11`
-- `androsh7/nuitka-compiler:0.3.0-aarch64-musl-1.2-py3.11`
+- `androsh7/nuitka-compiler:0.4.0-x86_64-glibc-2.28-py3.11`
+- `androsh7/nuitka-compiler:0.4.0-20260912-aarch64-musl-1.2-py3.11`
+
+Each image is published under three tags:
+
+| tag                                             | moves?                           | use it when                                                |
+| ----------------------------------------------- | -------------------------------- | ---------------------------------------------------------- |
+| `latest-<arch>-<libc>-py<python>`               | every publish                    | you always want the newest build                           |
+| `<VERSION>-<arch>-<libc>-py<python>`            | on every rebuild of that version | you want a given release, rebuilt with current base images |
+| `<VERSION>-<YYYYMMDD>-<arch>-<libc>-py<python>` | never                            | you need a byte-for-byte reproducible pin                  |
+
+Scheduled runs rebuild and republish the first two, so a `<VERSION>-` tag
+changes content over time. Pin the dated tag if that matters to you:
+
+```
+androsh7/nuitka-compiler:0.4.0-20260912-x86_64-glibc-2.17-py3.13
+```
+
+## CPython versions
+
+Each image builds CPython from a pinned release tag, not from the moving
+`3.x` maintenance branch. A commit landing upstream can therefore never
+change what a rebuild produces; bumping a version is a deliberate change,
+verified by CI like any other.
+
+| image `py` tag | CPython release |
+| -------------- | --------------- |
+| `3.9` | `v3.9.25` |
+| `3.10` | `v3.10.21` |
+| `3.11` | `v3.11.16` |
+| `3.12` | `v3.12.14` |
+| `3.13` | `v3.13.15` |
+| `3.14` | `v3.14.7` |
+
+The exact tag is recorded on every image as the `cpython-tag` label:
+
+```
+docker inspect --format '{{ index .Config.Labels "cpython-tag" }}' \
+  androsh7/nuitka-compiler:latest-x86_64-glibc-2.17-py3.13
+```
 
 ## Why does this exist?
 

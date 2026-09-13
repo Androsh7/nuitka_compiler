@@ -40,7 +40,7 @@ ca-certificates \
 
 # Build OpenSSL from source
 ARG OPENSSL_VERSION="3.0.18"
-RUN curl -fsSLO "https://www.openssl.org/source/openssl-${OPENSSL_VERSION}.tar.gz" \
+RUN curl -fsSLO "https://github.com/openssl/openssl/releases/download/openssl-${OPENSSL_VERSION}/openssl-${OPENSSL_VERSION}.tar.gz" \
 && tar -xzf "openssl-${OPENSSL_VERSION}.tar.gz" \
 && cd "openssl-${OPENSSL_VERSION}" \
 && ./config \
@@ -56,7 +56,8 @@ shared zlib \
 
 # Build Python from source
 ARG PYTHON_VERSION="3.13"
-RUN git clone --branch ${PYTHON_VERSION} --single-branch --depth 1 https://github.com/python/cpython.git \
+ARG CPYTHON_TAG="v3.13.15"
+RUN git clone --branch ${CPYTHON_TAG} --single-branch --depth 1 https://github.com/python/cpython.git \
 && export OPENSSL_ROOT=/opt/openssl \
 && export PATH="${OPENSSL_ROOT}/bin:${PATH}" \
 && export LD_LIBRARY_PATH="${OPENSSL_ROOT}/lib64:${OPENSSL_ROOT}/lib:${LD_LIBRARY_PATH}" \
