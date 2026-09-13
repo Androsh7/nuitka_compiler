@@ -12,6 +12,7 @@ from pathlib import Path
 # Project libraries
 from config import (
     ARCHITECTURES,
+    CPYTHON_TAGS,
     LIBC_TO_DOCKERFILE,
     NAMESPACE,
     OPENSSL_VERSION,
@@ -116,6 +117,9 @@ def build_docker_bake_file(
                 f'    "openssl-version" = "{image_spec.build_args.get("OPENSSL_VERSION", "not specified")}"\n'
             )
             bake_file.write(
+                f'    "cpython-tag" = "{image_spec.build_args.get("CPYTHON_TAG", "not specified")}"\n'
+            )
+            bake_file.write(
                 f'    "build-date" = "{build_date.strftime("%Y-%m-%d")}"\n'
             )
             bake_file.write('    "base-image-maintainer" = "The ManyLinux project"\n')
@@ -171,6 +175,7 @@ def select_build_images(
                         build_args={
                             "ARCHITECTURE": architecture,
                             "PYTHON_VERSION": python_version,
+                            "CPYTHON_TAG": CPYTHON_TAGS[python_version],
                             "OPENSSL_VERSION": OPENSSL_VERSION,
                         },
                     )

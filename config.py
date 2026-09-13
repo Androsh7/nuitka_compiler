@@ -23,6 +23,17 @@ LIBC_TO_DOCKERFILE = [
 ]
 ARCHITECTURES = ["x86_64", "aarch64"]
 PYTHON_VERSIONS = ["3.9", "3.10", "3.11", "3.12", "3.13", "3.14"]
+# CPython is built from these release tags rather than from the major.minor
+# maintenance branches, which move under us and have broken builds before.
+# Bumping a tag here is a deliberate change, verified by CI like any other.
+CPYTHON_TAGS = {
+    "3.9": "v3.9.25",
+    "3.10": "v3.10.21",
+    "3.11": "v3.11.16",
+    "3.12": "v3.12.14",
+    "3.13": "v3.13.15",
+    "3.14": "v3.14.7",
+}
 OPENSSL_VERSION = "3.0.18"
 NAMESPACE = "androsh7"
 SOURCE_URL = "https://github.com/Androsh7/nuitka_compiler_images"

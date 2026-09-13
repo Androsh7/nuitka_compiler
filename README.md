@@ -40,6 +40,29 @@ changes content over time. Pin the dated tag if that matters to you:
 androsh7/nuitka-compiler:0.4.0-20260912-x86_64-glibc-2.17-py3.13
 ```
 
+## CPython versions
+
+Each image builds CPython from a pinned release tag, not from the moving
+`3.x` maintenance branch. A commit landing upstream can therefore never
+change what a rebuild produces; bumping a version is a deliberate change,
+verified by CI like any other.
+
+| image `py` tag | CPython release |
+| -------------- | --------------- |
+| `3.9` | `v3.9.25` |
+| `3.10` | `v3.10.21` |
+| `3.11` | `v3.11.16` |
+| `3.12` | `v3.12.14` |
+| `3.13` | `v3.13.15` |
+| `3.14` | `v3.14.7` |
+
+The exact tag is recorded on every image as the `cpython-tag` label:
+
+```
+docker inspect --format '{{ index .Config.Labels "cpython-tag" }}' \
+  androsh7/nuitka-compiler:latest-x86_64-glibc-2.17-py3.13
+```
+
 ## Why does this exist?
 
 I love nuitka, it creates compact, fast, and portable python executables however it makes CI/CD a bit tricky.

@@ -54,7 +54,8 @@ shared zlib \
 
 # Build Python from source
 ARG PYTHON_VERSION="3.13"
-RUN git clone --branch ${PYTHON_VERSION} --single-branch --depth 1 https://github.com/python/cpython.git \
+ARG CPYTHON_TAG="v3.13.15"
+RUN git clone --branch ${CPYTHON_TAG} --single-branch --depth 1 https://github.com/python/cpython.git \
 && cd cpython \
 && export OPENSSL_ROOT=/opt/openssl \
 && export PATH="${OPENSSL_ROOT}/bin:${PATH}" \

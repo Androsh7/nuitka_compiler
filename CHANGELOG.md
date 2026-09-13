@@ -17,10 +17,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `push` input on the manual workflow trigger for publishing on demand
 - Immutable `<VERSION>-<YYYYMMDD>-` image tag, so a scheduled rebuild never changes an existing pin
 - `--build-date` flag for stamping a whole matrix build with one date
+- `cpython-tag` image label recording the exact CPython release an image was built from
 
 ### Changed
 
 - OpenSSL is fetched from the openssl GitHub releases instead of www.openssl.org
+- CPython is built from pinned release tags instead of the moving major.minor branches, which fixes the musl 3.13 build failure and makes rebuilds reproducible
 - Docker Hub publishing is skipped when its credentials are absent, so forks build without secrets
 - Registry logins only run when the workflow is publishing
 - `--show-build-steps` is superseded by `--progress`, it remains supported as a shorthand for `--progress auto`
