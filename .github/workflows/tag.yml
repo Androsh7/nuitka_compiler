@@ -1,0 +1,99 @@
+# On every push to main (i.e. a merged PR), read VERSION.txt and, if a tag
+# for that version doesn't already exist, create an annotated tag and a
+# GitHub Release whose notes are pulled from the matching CHANGELOG.md section.
+#
+# Assumptions:
+#   - VERSION.txt contains a bare semver string, e.g. "1.4.2"
+#   - CHANGELOG.md uses "## [1.4.2]" or "## 1.4.2" style headings
+#   - Tags are prefixed with "v" (change TAG_PREFIX below if not)
+
+name: Tag on merge to main
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - VERSION.txt
+      - CHANGELOG.md
+
+permissions:
+  contents: write
+
+concurrency:
+  group: tag-on-merge
+  cancel-in-progress: false
+
+jobs:
+  tag:
+    runs-on: ubuntu-latest
+    env:
+      TAG_PREFIX: v
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # need full history so tag lookups are accurate
+
+      - name: Read version
+        id: version
+        run: |
+          VERSION="$(tr -d '[:space:]' < VERSION.txt)"
+          if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+([-+][0-9A-Za-z.-]+)?$ ]]; then
+            echo "::error::VERSION.txt does not contain a valid semver string: '$VERSION'"
+            exit 1
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=${TAG_PREFIX}${VERSION}" >> "$GITHUB_OUTPUT"
+
+      - name: Check whether tag already exists
+        id: check
+        run: |
+          TAG="${{ steps.version.outputs.tag }}"
+          if git rev-parse -q --verify "refs/tags/$TAG" >/dev/null \
+             || git ls-remote --exit-code --tags origin "refs/tags/$TAG" >/dev/null; then
+            echo "Tag $TAG already exists — nothing to do."
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Extract changelog section
+        if: steps.check.outputs.exists == 'false'
+        id: notes
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          # Grab everything between the heading for this version and the next "## " heading.
+          NOTES="$(awk -v ver="$VERSION" '
+            /^## / {
+              if (found) exit
+              if (index($0, "[" ver "]") || $0 ~ ("^## " ver "([^0-9.]|$)")) { found=1; next }
+            }
+            found { print }
+          ' CHANGELOG.md | sed -e '/./,$!d')"
+          if [[ -z "$NOTES" ]]; then
+            echo "::warning::No CHANGELOG.md section found for $VERSION; using a default message."
+            NOTES="Release $VERSION"
+          fi
+          {
+            echo "body<<EOF"
+            echo "$NOTES"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Create and push tag
+        if: steps.check.outputs.exists == 'false'
+        run: |
+          TAG="${{ steps.version.outputs.tag }}"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "$TAG" -m "Release $TAG" -m "${{ steps.notes.outputs.body }}"
+          git push origin "refs/tags/$TAG"
+
+      - name: Create GitHub Release
+        if: steps.check.outputs.exists == 'false'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: ${{ steps.version.outputs.tag }}
+          body: ${{ steps.notes.outputs.body }}
+          prerelease: ${{ contains(steps.version.outputs.version, '-') }}
