@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.1]
+
+### Fixed
+
+- A release tag that disagrees with `VERSION.txt` is rejected before any image is built, instead of publishing the whole matrix under the version in the working tree
+- A tag older than the newest release is rejected, so republishing one can no longer move every `latest-` tag backwards onto stale content
+- A tag that is not on the tip of the default branch is rejected, so no image is published from code that no pull request verified in its final form
+- Publishing runs share one concurrency group, so two of them can no longer write the moving `latest-` and `<VERSION>-` tags at the same time
+
 ## [0.4.0]
 
 ### Added

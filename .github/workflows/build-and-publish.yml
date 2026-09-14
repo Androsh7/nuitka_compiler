@@ -16,9 +16,14 @@ on:
         type: boolean
         default: false
 
-# Supersede in-flight runs for the same reference on pull requests only
+# Every publishing run shares one group, so two of them can never write the
+# moving tags at the same time. Verification runs stay grouped per reference,
+# and only pull requests supersede an in-flight run.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: >-
+    ${{ github.workflow }}-${{ (github.event_name == 'schedule' ||
+    github.event_name == 'workflow_dispatch' || github.ref_type == 'tag')
+    && 'publish' || github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
@@ -33,6 +38,56 @@ jobs:
     outputs:
       build_date: ${{ steps.stamp.outputs.build_date }}
     steps:
+      - name: Checkout
+        # Every tag and the whole history, so the release checks below can see
+        # what else is tagged and where the default branch points.
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # A publishing run moves the latest- and <VERSION>- tags, so it may only
+      # ever run on the newest release, built from code that is already on the
+      # default branch. All three checks fail here rather than after
+      # thirty-six builds and a registry full of wrong images.
+      - name: Verify the release tag
+        if: github.ref_type == 'tag'
+        env:
+          REF_NAME: ${{ github.ref_name }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          set -euo pipefail
+
+          # Image tags carry the version from VERSION.txt, not the git tag.
+          version="$(tr -d '[:space:]' < VERSION.txt)"
+          if [ "$REF_NAME" != "v$version" ]; then
+            echo "tag $REF_NAME would publish images tagged $version" >&2
+            echo "move the tag, or set VERSION.txt to ${REF_NAME#v}" >&2
+            exit 1
+          fi
+
+          # An older tag republished after a newer one drags every latest- tag
+          # back onto stale content.
+          newest_tag="$(git tag --list 'v*' --sort=-v:refname | head -n 1)"
+          if [ "$REF_NAME" != "$newest_tag" ]; then
+            echo "tag $REF_NAME is not the newest release, $newest_tag is" >&2
+            echo "publishing it would move every latest- tag backwards" >&2
+            exit 1
+          fi
+
+          # Anything not on the tip of the default branch is code no pull
+          # request has verified in its final form.
+          git fetch --no-tags origin "$DEFAULT_BRANCH"
+          branch_commit="$(git rev-parse FETCH_HEAD)"
+          tag_commit="$(git rev-parse HEAD)"
+          if [ "$tag_commit" != "$branch_commit" ]; then
+            echo "tag $REF_NAME is on $tag_commit" >&2
+            echo "$DEFAULT_BRANCH is on $branch_commit" >&2
+            echo "re-tag the tip of $DEFAULT_BRANCH, or merge the tagged commit first" >&2
+            exit 1
+          fi
+
+          echo "publishing version $version from $tag_commit" >> "$GITHUB_STEP_SUMMARY"
+
       - name: Determine build date
         id: stamp
         run: |
